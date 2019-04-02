@@ -1,0 +1,35 @@
+---
+- name: load variables based on system type
+  include_vars: "{{ item }}"
+  with_first_found:
+    - "vars/{{ ansible_system }}.yml"
+
+- name: print download URL
+  debug: >
+    msg="Download URL: {{ terraform.src_file_url }}"
+
+- name: download src file
+  get_url:
+   url={{ terraform.src_file_url }}
+   dest=/usr/local/src/{{ terraform.src_file_url | basename }}
+   sha256sum={{ terraform.src_file_sha256 }}
+  register: src_file
+
+- name: stat /usr/local/bin/terraform
+  stat:
+    path: /usr/local/bin/terraform
+  register: terraform_binary
+
+- block:
+  - name: remove old version
+    file:
+     path=/usr/local/bin/terraform
+     state=absent
+
+  - name: extract the src file
+    unarchive:
+     src=/usr/local/src/{{ terraform.src_file_url | basename }}
+     dest=/usr/local/bin
+     copy=no
+
+  when: src_file is changed or not terraform_binary.stat.exists
